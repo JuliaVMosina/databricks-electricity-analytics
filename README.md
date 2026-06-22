@@ -34,6 +34,9 @@ forecast, and surfaced in a native Databricks AI/BI dashboard.
             Databricks AI/BI dashboard
 ```
 
+## Dashboard
+![Databricks AI/BI dashboard](dashboard/dashboard.png)
+
 ## Results & insights
 - **Finland is a net electricity importer** — production averages 9,100 MWh/h vs 9,624 MWh/h demand.
 - **Spot price rises as temperature falls** — cold snaps drive electric-heating demand.
