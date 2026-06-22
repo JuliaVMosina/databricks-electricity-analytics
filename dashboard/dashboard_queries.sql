@@ -13,9 +13,11 @@ SELECT
 FROM raw.electricity.silver_energy_hourly;
 
 -- DATASET 2: daily_balance  (line: consumption vs production over time)
+-- Exclude the final partial day so the lines don't dip to ~0 at the edge.
 SELECT date, consumption_gwh, production_gwh, net_balance_gwh,
        avg_renewable_share_pct, avg_price_eur_mwh, avg_temp_c
 FROM raw.electricity.gold_daily
+WHERE date < (SELECT max(date) FROM raw.electricity.gold_daily)
 ORDER BY date;
 
 -- DATASET 3: generation_mix  (stacked bar: monthly GWh by source)
