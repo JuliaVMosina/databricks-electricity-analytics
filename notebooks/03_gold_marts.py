@@ -48,10 +48,19 @@ from pyspark.ml.feature import VectorAssembler
 from pyspark.ml.regression import GBTRegressor
 from pyspark.ml import Pipeline
 from pyspark.ml.evaluation import RegressionEvaluator
+from pyspark.sql.window import Window
 
-feat = ["temperature_c", "wind_speed_ms", "hour", "weekday", "month"]
-df = silver.select("hour_utc", "hour_local", "consumption_mwh", *feat) \
-           .dropna(subset=["consumption_mwh"] + feat)
+# Demand is strongly autocorrelated — add lag features (known at day-ahead time:
+# yesterday's and last week's demand for the same hour). Without these the model
+# can't beat the mean on a low-variance summer holdout (R2 went negative).
+w = Window.orderBy("hour_utc")
+base = (silver.select("hour_utc", "hour_local", "consumption_mwh",
+                      "temperature_c", "wind_speed_ms", "hour", "weekday", "month")
+        .withColumn("lag_24h",  F.lag("consumption_mwh", 24).over(w))
+        .withColumn("lag_168h", F.lag("consumption_mwh", 168).over(w)))
+
+feat = ["temperature_c", "wind_speed_ms", "hour", "weekday", "month", "lag_24h", "lag_168h"]
+df = base.dropna(subset=["consumption_mwh"] + feat)
 
 cutoff = df.agg(F.max("hour_utc")).first()[0] - timedelta(days=90)
 train = df.filter(F.col("hour_utc") < F.lit(cutoff))
@@ -60,7 +69,7 @@ test  = df.filter(F.col("hour_utc") >= F.lit(cutoff))
 pipe = Pipeline(stages=[
     VectorAssembler(inputCols=feat, outputCol="features"),
     GBTRegressor(featuresCol="features", labelCol="consumption_mwh",
-                 maxIter=60, maxDepth=5),
+                 maxIter=80, maxDepth=5),
 ])
 model = pipe.fit(train)
 pred = model.transform(test)
