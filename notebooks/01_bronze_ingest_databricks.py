@@ -111,13 +111,22 @@ for name, ds_id in FINGRID_DATASETS.items():
 
 
 # ==== CELL 4 — FMI weather → bronze ========================================
+def week_chunks(start_date, end_date, days=7):
+    # FMI WFS rejects long intervals (~168h max per request); chunk weekly.
+    cur = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
+    end = datetime.fromisoformat(end_date).replace(tzinfo=timezone.utc)
+    while cur < end:
+        nxt = min(cur + timedelta(days=days), end)
+        yield cur, nxt
+        cur = nxt
+
 def fetch_fmi(place, parameters, start_date, end_date):
     ns = {"wml2": "http://www.opengis.net/waterml/2.0"}
     out = []
-    for c_start, c_end in month_chunks(start_date, end_date):
+    for c_start, c_end in week_chunks(start_date, end_date, 7):
         params = {"service": "WFS", "version": "2.0.0", "request": "getFeature",
                   "storedquery_id": "fmi::observations::weather::timevaluepair",
-                  "place": place, "parameters": parameters,
+                  "place": place, "parameters": parameters, "timestep": 60,
                   "starttime": iso_z(c_start), "endtime": iso_z(c_end)}
         r = requests.get("https://opendata.fmi.fi/wfs", params=params, timeout=120)
         r.raise_for_status()
